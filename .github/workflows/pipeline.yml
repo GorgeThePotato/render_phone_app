@@ -1,0 +1,45 @@
+name: Deployment pipeline
+
+on:
+  push:
+    branches:
+      - master
+
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize]
+
+jobs:
+  simple_deployment_pipeline:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+      
+      - name: Install dependencies
+        run: npm install
+
+      - name: Check style
+        run: npm run lint
+      
+      - name: Trigger deployment
+        if: ${{ github.event_name == 'push' && !contains(join(github.event.commits.*.message, '\n'), '#skip') && !contains(join(github.event.commits.*.message, '\n'), '[ci skip]') && !contains(join(github.event.commits.*.message, '\n'), '[no ci]') && !contains(join(github.event.commits.*.message, '\n'), '[skip actions]') && !contains(join(github.event.commits.*.message, '\n'), '[actions skip]')}}
+        run: curl https://api.render.com/deploy/srv-${{ secrets.RENDER_SERVICE_ID }}?key=${{ secrets.RENDER_API_KEY }}
+        
+  tag_release:
+    needs: [simple_deployment_pipeline]
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: '0'
+      
+      - name: Bump version and push tag
+        if: ${{ github.event_name == 'push' && !contains(join(github.event.commits.*.message, '\n'), '#skip') && !contains(join(github.event.commits.*.message, '\n'), '[ci skip]') && !contains(join(github.event.commits.*.message, '\n'), '[no ci]') && !contains(join(github.event.commits.*.message, '\n'), '[skip actions]') && !contains(join(github.event.commits.*.message, '\n'), '[actions skip]')}}
+        uses: anothrNick/github-tag-action@1.64.0 
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEFAULT_BUMP: patch 
+          WITH_V: false
